@@ -5,6 +5,8 @@ import pytest
 import sys
 from   time import time
 
+from nostril.helpers import test_labeled, test_unlabeled
+
 try:
     thisdir = os.path.dirname(os.path.abspath(__file__))
     sys.path.append(os.path.join(thisdir, '..'))
