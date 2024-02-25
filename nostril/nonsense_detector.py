@@ -145,8 +145,8 @@ stored results were produced after experimenting with 2-grams, 3-grams,
 4-grams and 5-grams, and and different thresholds.  The best performance
 achieved was reached with 4-grams, and that is the value stored in the
 ngram_data.pklz pickle file in this directory.  The pickle file stores the
-values computed by the function ngram_values(); each entry is a named tuple
-of type NGramData and contains frequencies and IDF scores for each
+values computed by the function ngram_values(); each entry is a struct of
+type NGramDataStruct and contains frequencies and IDF scores for each
 n-gram.  (This can be done because IDF values can be precomputed based on a
 training set, and do not reply on a particular string being tested during
 classification -- the IDF values depend only on the frequency characteristics
@@ -263,22 +263,17 @@ software was developed as part of the CASICS project, the Comprehensive and
 Automated Software Inventory Creation System. For more, visit http://casics.org.
 '''
 
-from collections import defaultdict
+from collections import defaultdict, Counter
+from functools import partial
 from math import pow, log, ceil
 import os
 import re
 import string
 import sys
 from typing import List, Dict, Tuple, Callable, Optional, Union
-from . import ng
+from .ng import NGramDataStruct
 
-from nostril import NGramData
 
-STRING_FREQ_KEY=0
-TOTAL_FREQ_KEY=1
-IDF_KEY=2
-
-
 # General n-gram functions.
 # .............................................................................
 
@@ -321,18 +316,19 @@ def _ngram_idf_value(total_num_strings: int, string_frequency: int,
     #    return log(max_frequency/(1 + string_frequency), 2)
 
 
-def _highest_idf(ngram_freq: Dict[str, List[Union[float, int]]]) -> Union[float, int]:
+def _highest_idf(ngram_freq: Dict[str, NGramDataStruct]) -> Union[float, int]:
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest IDF value of any n-gram.
     '''
-    return max(ngram_freq[n][IDF_KEY] for n in ngram_freq.keys())
+    return max(ngram_freq[n].idf for n in ngram_freq)
 
 
-def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> Union[float, int]:
+def _highest_total_frequency(ngram_freq: Dict[str, NGramDataStruct]) -> Union[float, int]:
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest total frequency of any n-gram.
     '''
-    return max(ngram_freq[n][1] for n in ngram_freq.keys())
+    return max(ngram_freq[n].total_frequency for n in ngram_freq)
+
 
 
 # def _ngram_values(string_list: List[str], n: int, readjust_zero_scores: bool=True) -> dict:
@@ -340,8 +336,8 @@ def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> 
 #     statistics across the corpus.  Returns the results as a dictionary
 #     containing all possible n-grams, where the dictionary keys are the
 #     n-grams as strings (e.g., 'aa', 'ab', 'ac', ...) and the dictionary
-#     values dictionary are the named tuple NGramData.  The numeric values
-#     inside the NGramData reflect the frequency statistics for that n-gram
+#     values dictionary are the struct NGramDataStruct.  The numeric values
+#     inside the NGramDataStruct reflect the frequency statistics for that n-gram
 #     across the whole corpus.
 #
 #     The optional argument 'readjust_zero_scores' governs what happens to the
@@ -358,7 +354,7 @@ def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> 
 #     is more efficient to store the desired value.  This is the reason the
 #     default is readjust_zero_scores = True.  Note that it is still possible
 #     to determine that a given n-gram does not appear in the corpus simply by
-#     looking at the string_frequency field of the NGramData tuple for that
+#     looking at the string_frequency field of the NGramDataStruct struct for that
 #     n-gram, so we do not really lose any information by doing this.)
 #     '''
 #     counts: Dict[str, int] = defaultdict(int)
@@ -385,7 +381,7 @@ def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> 
 #     if readjust_zero_scores:
 #         max_idf = ceil(_highest_idf(all_ngrams))
 #         for ngram, value in all_ngrams.items():
-#             if value[IDF_KEY] == 0:
+#             if value.idf == 0:
 #                 # Can't set a value in an existing tuple; must regenerate tuple
 #                 all_ngrams[ngram] = (0, 0, max_idf)
 #     return all_ngrams
@@ -396,7 +392,22 @@ def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> 
 
 _delchars = str.maketrans('', '', string.punctuation + string.digits + ' ')
 
-def _tfidf_score_function(ngram_freq: Dict[str, List[Union[float, int]]], len_threshold: int=25, len_penalty_exp: float=1.365,
+def _score_function(ngram_freq: Dict[str, NGramDataStruct], len_threshold: int, len_penalty_exp: float, repetition_penalty_exp: float, ngram_length: int, max_freq: int, s: str) -> float:
+    # We only score alpha characters.
+    s = s.translate(_delchars)
+    # Generate list of n-grams for the given string.
+    string_ngrams = ngrams(s, ngram_length)
+    # Count up occurrences of each n-gram in the string.
+    ngram_counts: Dict[str, int] = defaultdict(int)
+    for ngram in string_ngrams:
+        ngram_counts[ngram] += 1
+    num_ngrams = len(string_ngrams)
+    length_penalty = pow(max(0, num_ngrams - len_threshold), len_penalty_exp)
+    score = sum(ngram_freq[n].idf * pow(c, repetition_penalty_exp) * (0.5 + 0.5 * c / max_freq)
+                for n, c in ngram_counts.items()) + length_penalty
+    return score / (1 + num_ngrams)
+
+def _tfidf_score_function(ngram_freq: Dict[str, NGramDataStruct], len_threshold: int=25, len_penalty_exp: float=1.365,
                           repetition_penalty_exp: float=1.159) -> Callable:
     '''Generate a function (as a closure) that computes a score for a given
     string.  This needs to be called to create the function like this:
@@ -456,21 +467,7 @@ def _tfidf_score_function(ngram_freq: Dict[str, List[Union[float, int]]], len_th
     max_freq = _highest_total_frequency(ngram_freq)
     ngram_length = len(next(iter(ngram_freq.keys())))
     len_threshold = int(len_threshold)
-    def score_function(s: str) -> float:
-        # We only score alpha characters.
-        s = s.translate(_delchars)
-        # Generate list of n-grams for the given string.
-        string_ngrams = ngrams(s, ngram_length)
-        # Count up occurrences of each n-gram in the string.
-        ngram_counts: Dict[str, int] = defaultdict(int)
-        for ngram in string_ngrams:
-            ngram_counts[ngram] += 1
-        num_ngrams = len(string_ngrams)
-        length_penalty = pow(max(0, num_ngrams - len_threshold), len_penalty_exp)
-        score = sum(ngram_freq[n][IDF_KEY] * pow(c, repetition_penalty_exp) * (0.5 + 0.5*c/max_freq)
-                    for n, c in ngram_counts.items()) + length_penalty
-        return score/(1 + num_ngrams)
-    return score_function
+    return partial(_score_function, ngram_freq, len_threshold, len_penalty_exp, repetition_penalty_exp, ngram_length, max_freq)
 
 
 # Heuristic pattern matching filter
@@ -597,7 +594,7 @@ def sanitize_string(s: str) -> str:
     return s.lower().translate(_delete_nonalpha)
 
 
-def generate_nonsense_detector(ngram_freq: Optional[Dict[str, List[Union[float, int]]]]=None,
+def generate_nonsense_detector(ngram_freq: Optional[Dict[str, NGramDataStruct]]=None,
                                min_length: int=6, min_score: float=8.2, trace: bool=False,
                                pickle_file: str='ngram_data.mpk',
                                score_len_threshold: int=25,
@@ -622,7 +619,6 @@ def generate_nonsense_detector(ngram_freq: Optional[Dict[str, List[Union[float, 
         if not os.path.exists(file):
             raise ValueError('Cannot find pickle file {}'.format(file))
         ngram_freq = dataset_from_msgpack(file)
-    print(type(ngram_freq))
     string_score = _tfidf_score_function(ngram_freq,
                                         len_threshold=score_len_threshold,
                                         len_penalty_exp=score_len_penalty_exp,
@@ -670,16 +666,21 @@ def generate_nonsense_detector(ngram_freq: Optional[Dict[str, List[Union[float, 
 # will not be defined in that module, and consequently, the pickle load will
 # fail.
 
-def dataset_from_pickle(file: str):
+def dataset_from_pickle(file):
     '''Return the contents of the compressed pickle file in 'file'.  The
     pickle is assumed to contain only one data structure.
     '''
     import gzip, pickle
+    try:
+        from . import ng
+        sys.modules['ngrams'] = ng
+    except:
+        pass
     with gzip.open(file, 'rb') as pickle_file:
         return pickle.load(pickle_file)
 
 
-def dataset_to_pickle(file: str, data_set: Dict[str, List[Union[float, int]]]) -> None:
+def dataset_to_pickle(file: str, data_set: Dict[str, NGramDataStruct]) -> None:
     '''Save the contents of 'data_set' to the compressed pickle file 'file'.
     The pickle is assumed to contain only one data structure.
     '''
@@ -688,7 +689,7 @@ def dataset_to_pickle(file: str, data_set: Dict[str, List[Union[float, int]]]) -
         pickle.dump(data_set, pickle_file)
 
 
-def dataset_from_msgpack(file: str) -> Dict[str, List[Union[float, int]]]:
+def dataset_from_msgpack(file: str) -> Dict[str, NGramDataStruct]:
     '''Return the contents of the compressed msgpack file in 'file'.  The
     msgpack is assumed to contain only one data structure.
     '''
@@ -696,7 +697,7 @@ def dataset_from_msgpack(file: str) -> Dict[str, List[Union[float, int]]]:
 
     with open(file, 'rb') as msgpack_file:
         compressed = msgpack_file.read()
-        return msgspec.msgpack.decode(compressed)
+        return msgspec.msgpack.decode(compressed, type=dict[str, NGramDataStruct])
 
 
 def dataset_to_msgpack(file, data_set):
@@ -1005,5 +1006,5 @@ def test_labeled(input_file, nonsense_tester, min_length=6, trace_scores=False,
 #     max_tf = _highest_total_frequency(ngram_freq)
 #     for ng, count in found.items():
 #         _msg('{}: {} x {} (max {}) score = {}'
-#             .format(ng, count, ngram_freq[ng][IDF_KEY], max_tf,
-#                     ngram_freq[ng][IDF_KEY] * pow(count, 1.195) * (0.5 + 0.5*count/ngram_freq[ng].max_frequency)))
+#             .format(ng, count, ngram_freq[ng].idf, max_tf,
+#                     ngram_freq[ng].idf * pow(count, 1.195) * (0.5 + 0.5*count/ngram_freq[ng].max_frequency)))

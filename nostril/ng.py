@@ -22,11 +22,18 @@ Automated Software Inventory Creation System. For more, visit http://casics.org.
 
 from collections import namedtuple
 
-
+import msgspec
+
 # Global data structures.
 # .............................................................................
 
 NGramData = namedtuple('NGramData', 'string_frequency, total_frequency, idf')
+
+class NGramDataStruct (msgspec.Struct, gc=False, omit_defaults=True):
+    string_frequency: int = 0
+    total_frequency: int = 0
+    idf: float = 21
+
 '''
 In analogy to typical applications of IDF, a "document" in our case is a
 text string, and the "corpus" of documents is the set of all strings used

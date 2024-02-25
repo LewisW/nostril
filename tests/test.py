@@ -13,6 +13,8 @@ except:
 
 from nostril import *
 
+nonsense = generate_nonsense_detector()
+
 assert nonsense('lakdfqtajaklj')
 assert nonsense('AaBbCcDdEeFGgHhIiJjKkLlMmNnOoPpQqRrSsTtU')
 assert nonsense('AcoGQMJyIapivScpnfuXUDMtgTtvAACYdAyABnSLpoABhzZWAAVvAYAAAnqUAFTPo')

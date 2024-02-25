@@ -9,6 +9,8 @@
 
 import os
 from   os import path
+
+from   mypyc.build import mypycify
 from   setuptools import setup
 import sys
 
@@ -48,4 +50,7 @@ setup(
     install_requires = reqs,
     platforms        = 'any',
     python_requires  = '>=3',
+    ext_modules      = mypycify([
+        'nostril/nonsense_detector.py',
+    ]),
 )
