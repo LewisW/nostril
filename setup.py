@@ -34,6 +34,8 @@ with open(path.join(here, 'nostril/__version__.py')) as f:
 
 # Finally, define our namesake.
 
+print('reqs:', reqs)
+
 setup(
     name             = version['__title__'].lower(),
     description      = version['__description__'],
