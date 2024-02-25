@@ -1,5 +1,9 @@
 # Testing utilities.
 # .............................................................................
+import os
+
+from nostril.nonsense_detector import _msg
+
 
 def test_unlabeled(input, nonsense_tester, min_length=6, sense='valid',
                    trace_scores=False, save_to=None):
