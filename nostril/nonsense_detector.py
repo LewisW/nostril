@@ -269,6 +269,7 @@ import os
 import re
 import string
 import sys
+from nostril import NGramData
 
 
 # General n-gram functions.
@@ -597,7 +598,7 @@ def sanitize_string(s):
 
 def generate_nonsense_detector(ngram_freq=None,
                                min_length=6, min_score=8.2, trace=False,
-                               pickle_file='ngram_data.pklz',
+                               pickle_file='ngram_data.mpk',
                                score_len_threshold=25,
                                score_len_penalty_exp=0.9233,
                                score_rep_penalty_exp=0.9674):
@@ -619,7 +620,7 @@ def generate_nonsense_detector(ngram_freq=None,
         file = _full_path(pickle_file)
         if not os.path.exists(file):
             raise ValueError('Cannot find pickle file {}'.format(file))
-        ngram_freq = dataset_from_pickle(file)
+        ngram_freq = dataset_from_msgpack(file)
     string_score = _tfidf_score_function(ngram_freq,
                                         len_threshold=score_len_threshold,
                                         len_penalty_exp=score_len_penalty_exp,
@@ -688,6 +689,33 @@ def dataset_to_pickle(file, data_set):
     import gzip, pickle
     with gzip.open(file, 'wb') as pickle_file:
         pickle.dump(data_set, pickle_file)
+
+
+def dataset_from_msgpack(file):
+    '''Return the contents of the compressed msgpack file in 'file'.  The
+    msgpack is assumed to contain only one data structure.
+    '''
+    import msgspec
+    try:
+        from . import ng
+        sys.modules['ngrams'] = ng
+    except:
+        pass
+
+    with open(file, 'rb') as msgpack_file:
+        compressed = msgpack_file.read()
+        return {k: NGramData(v[0], v[1], v[2]) for k, v in msgspec.msgpack.decode(compressed).items()}
+
+
+def dataset_to_msgpack(file, data_set):
+    '''Save the contents of 'data_set' to the compressed msgpack file 'file'.
+    The msgpack is assumed to contain only one data structure.
+    '''
+    import msgspec
+    with open(file, 'wb') as msgpack_file:
+        compressed = msgspec.msgpack.encode(data_set)
+        msgpack_file.write(compressed)
+
 
 
 # Miscellaneous general utilities.

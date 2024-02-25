@@ -44,7 +44,7 @@ setup(
     keywords         = "program-analysis text-processing gibberish-detection identifiers",
     packages         = ['nostril'],
     scripts          = ['bin/nostril'],
-    package_data     = {'nostril': ['ngram_data.pklz']},
+    package_data     = {'nostril': ['ngram_data.mpk']},
     install_requires = reqs,
     platforms        = 'any',
     python_requires  = '>=3',

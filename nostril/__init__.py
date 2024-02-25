@@ -118,5 +118,5 @@ from .__version__ import __license__, __copyright__
 from .ng import NGramData
 from .nonsense_detector import (
     nonsense, generate_nonsense_detector, test_unlabeled, test_labeled,
-    ngrams, dataset_from_pickle, sanitize_string
+    ngrams, dataset_from_pickle, dataset_from_msgpack, sanitize_string
 )
