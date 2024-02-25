@@ -19,7 +19,7 @@ dependencies = {file = ["requirements.txt"]}
 optional-dependencies = {dev = { file = ["requirements-dev.txt"] }}
 
 [tool.setuptools.package-data]
-nostril = ["ngram_data.mpk"]
+nostril = ["ngram_data.mpk", "py.typed"]
 
 [tool.mypy]
 exclude = "tests"
