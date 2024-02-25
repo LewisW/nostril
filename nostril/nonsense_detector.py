@@ -271,6 +271,10 @@ import string
 import sys
 from nostril import NGramData
 
+STRING_FREQ_KEY=0
+TOTAL_FREQ_KEY=1
+IDF_KEY=2
+
 
 # General n-gram functions.
 # .............................................................................
@@ -318,14 +322,14 @@ def _highest_idf(ngram_freq):
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest IDF value of any n-gram.
     '''
-    return max(ngram_freq[n].idf for n in ngram_freq.keys())
+    return max(ngram_freq[n][IDF_KEY] for n in ngram_freq.keys())
 
 
 def _highest_total_frequency(ngram_freq):
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest total frequency of any n-gram.
     '''
-    return max(ngram_freq[n].total_frequency for n in ngram_freq.keys())
+    return max(ngram_freq[n][TOTAL_FREQ_KEY] for n in ngram_freq.keys())
 
 
 def _ngram_values(string_list, n, readjust_zero_scores=True):
@@ -365,28 +369,22 @@ def _ngram_values(string_list, n, readjust_zero_scores=True):
             counts[ngram] += 1
     # Set initial values for all n-grams.
     all_ngrams = defaultdict.fromkeys(_all_possible_ngrams(n),
-                                      NGramData(string_frequency=0,
-                                                total_frequency=0,
-                                                idf=0))
+                                      (0, 0, 0))
     # Set n-gram values based on occurrences in the corpus.
     max_frequency = max([count for ngram, count in counts.items()])
     for ngram, string_list in occurrences.items():
         string_freq = len(string_list)
         total_freq = counts[ngram]
         score = _ngram_idf_value(num_strings, string_freq, total_freq, max_frequency)
-        all_ngrams[ngram] = NGramData(string_frequency=string_freq,
-                                      total_frequency=total_freq,
-                                      idf=score)
+        all_ngrams[ngram] = (string_freq, total_freq, score)
     # Now that we've seen all n-grams actually present in the corpus, go back
     # and set those that have 0 values to a very high value (=> rare n-gram).
     if readjust_zero_scores:
         max_idf = ceil(_highest_idf(all_ngrams))
         for ngram, value in all_ngrams.items():
-            if value.idf == 0:
+            if value[IDF_KEY] == 0:
                 # Can't set a value in an existing tuple; must regenerate tuple
-                all_ngrams[ngram] = NGramData(string_frequency=0,
-                                              total_frequency=0,
-                                              idf=max_idf)
+                all_ngrams[ngram] = (0, 0, max_idf)
     return all_ngrams
 
 
@@ -466,7 +464,7 @@ def _tfidf_score_function(ngram_freq, len_threshold=25, len_penalty_exp=1.365,
             ngram_counts[ngram] += 1
         num_ngrams = len(string_ngrams)
         length_penalty = pow(max(0, num_ngrams - len_threshold), len_penalty_exp)
-        score = sum(ngram_freq[n].idf * pow(c, repetition_penalty_exp) * (0.5 + 0.5*c/max_freq)
+        score = sum(ngram_freq[n][IDF_KEY] * pow(c, repetition_penalty_exp) * (0.5 + 0.5*c/max_freq)
                     for n, c in ngram_counts.items()) + length_penalty
         return score/(1 + num_ngrams)
     return score_function
@@ -704,7 +702,8 @@ def dataset_from_msgpack(file):
 
     with open(file, 'rb') as msgpack_file:
         compressed = msgpack_file.read()
-        return {k: NGramData(v[0], v[1], v[2]) for k, v in msgspec.msgpack.decode(compressed).items()}
+        data = msgspec.msgpack.decode(compressed)
+        return data
 
 
 def dataset_to_msgpack(file, data_set):
@@ -970,7 +969,7 @@ def tabulate_scores(string_list, ngram_freq, show=50, portion='all',
 # Module exports.
 # .............................................................................
 
-nonsense = generate_nonsense_detector()
+#nonsense = generate_nonsense_detector()
 
 
 # -----------------------------------------------------------------------------
@@ -1013,5 +1012,5 @@ nonsense = generate_nonsense_detector()
 #     max_tf = _highest_total_frequency(ngram_freq)
 #     for ng, count in found.items():
 #         _msg('{}: {} x {} (max {}) score = {}'
-#             .format(ng, count, ngram_freq[ng].idf, max_tf,
-#                     ngram_freq[ng].idf * pow(count, 1.195) * (0.5 + 0.5*count/ngram_freq[ng].max_frequency)))
+#             .format(ng, count, ngram_freq[ng][IDF_KEY], max_tf,
+#                     ngram_freq[ng][IDF_KEY] * pow(count, 1.195) * (0.5 + 0.5*count/ngram_freq[ng].max_frequency)))
