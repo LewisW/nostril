@@ -700,7 +700,7 @@ def dataset_from_msgpack(file: str) -> Dict[str, NGramDataStruct]:
         return msgspec.msgpack.decode(compressed, type=dict[str, NGramDataStruct])
 
 
-def dataset_to_msgpack(file, data_set):
+def dataset_to_msgpack(file: str, data_set: Dict[str, NGramDataStruct]) -> None:
     '''Save the contents of 'data_set' to the compressed msgpack file 'file'.
     The msgpack is assumed to contain only one data structure.
     '''
@@ -738,7 +738,7 @@ def _full_path(filename: str, subdir: Optional[str]=None) -> str:
             return os.path.join(thisdir, filename)
 
 
-def _msg(text):
+def _msg(text: str) -> None:
     '''Like the standard print(), but flushes the output immediately and
     colorizes the output by default. Flushing immediately is useful when
     piping the output of a script, because Python by default will buffer the
