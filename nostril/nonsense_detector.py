@@ -269,6 +269,9 @@ import os
 import re
 import string
 import sys
+from typing import List, Dict, Tuple, Callable, Optional, Union
+from . import ng
+
 from nostril import NGramData
 
 STRING_FREQ_KEY=0
@@ -279,12 +282,12 @@ IDF_KEY=2
 # General n-gram functions.
 # .............................................................................
 
-def ngrams(s, n):
+def ngrams(s: str, n: int) -> List[str]:
     '''Return all n-grams of length 'n' for the given string 's'.'''
     return [s[i : i + n] for i in range(len(s) - n + 1)]
 
 
-def _all_possible_ngrams(n):
+def _all_possible_ngrams(n: int) -> List[str]:
     '''Recursively create all possible n-grams using lower case letters.'''
     all_letters = string.ascii_lowercase
     if n == 0:
@@ -301,8 +304,8 @@ def _all_possible_ngrams(n):
 # Functions to calculate scores for our modified TF-IDF.
 # .............................................................................
 
-def _ngram_idf_value(total_num_strings, string_frequency,
-                     total_frequency, max_frequency):
+def _ngram_idf_value(total_num_strings: int, string_frequency: int,
+                     total_frequency: int, max_frequency: int) -> float:
     '''Computes an inverse document frequency score.  In analogy to typical
     applications of IDF, a "document" in our case is a text string, and the
     "corpus" of documents is the set of all strings used for training.  This
@@ -318,74 +321,74 @@ def _ngram_idf_value(total_num_strings, string_frequency,
     #    return log(max_frequency/(1 + string_frequency), 2)
 
 
-def _highest_idf(ngram_freq):
+def _highest_idf(ngram_freq: Dict[str, List[Union[float, int]]]) -> Union[float, int]:
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest IDF value of any n-gram.
     '''
     return max(ngram_freq[n][IDF_KEY] for n in ngram_freq.keys())
 
 
-def _highest_total_frequency(ngram_freq):
+def _highest_total_frequency(ngram_freq: Dict[str, List[Union[float, int]]]) -> Union[float, int]:
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest total frequency of any n-gram.
     '''
-    return max(ngram_freq[n][TOTAL_FREQ_KEY] for n in ngram_freq.keys())
+    return max(ngram_freq[n][1] for n in ngram_freq.keys())
 
 
-def _ngram_values(string_list, n, readjust_zero_scores=True):
-    '''Given the corpus of strings in 'string_list', computes n-gram
-    statistics across the corpus.  Returns the results as a dictionary
-    containing all possible n-grams, where the dictionary keys are the
-    n-grams as strings (e.g., 'aa', 'ab', 'ac', ...) and the dictionary
-    values dictionary are the named tuple NGramData.  The numeric values
-    inside the NGramData reflect the frequency statistics for that n-gram
-    across the whole corpus.
-
-    The optional argument 'readjust_zero_scores' governs what happens to the
-    IDF values assigned to n-grams that do not appear in the corpus at all.
-    If readjust_zero_scores = False, nothing is done, and the values are left
-    at 0.  If readjust_zero_scores = True, the value is set equal to the
-    highest IDF value found across the 'string_list' corpus.  (In our
-    application, values of 0 in this situation are *not* desirable.  In IDF
-    terms, a lower value indicates a more frequently-seen n-gram, whereas in
-    our application, we look for uncommon n-grams and thus we want never-seen
-    n-grams to have a *high* value.  This *could* be handled by detecting
-    them when computing string scores, but that simply introduces needless
-    repeated if-then tests in the step of computing scores for strings.  It
-    is more efficient to store the desired value.  This is the reason the
-    default is readjust_zero_scores = True.  Note that it is still possible
-    to determine that a given n-gram does not appear in the corpus simply by
-    looking at the string_frequency field of the NGramData tuple for that
-    n-gram, so we do not really lose any information by doing this.)
-    '''
-    counts = defaultdict(int)
-    occurrences = defaultdict(set)
-    num_strings = 0
-    for s in string_list:
-        s = s.lower()
-        num_strings += 1
-        for ngram in ngrams(s, n):
-            occurrences[ngram].add(s)
-            counts[ngram] += 1
-    # Set initial values for all n-grams.
-    all_ngrams = defaultdict.fromkeys(_all_possible_ngrams(n),
-                                      (0, 0, 0))
-    # Set n-gram values based on occurrences in the corpus.
-    max_frequency = max([count for ngram, count in counts.items()])
-    for ngram, string_list in occurrences.items():
-        string_freq = len(string_list)
-        total_freq = counts[ngram]
-        score = _ngram_idf_value(num_strings, string_freq, total_freq, max_frequency)
-        all_ngrams[ngram] = (string_freq, total_freq, score)
-    # Now that we've seen all n-grams actually present in the corpus, go back
-    # and set those that have 0 values to a very high value (=> rare n-gram).
-    if readjust_zero_scores:
-        max_idf = ceil(_highest_idf(all_ngrams))
-        for ngram, value in all_ngrams.items():
-            if value[IDF_KEY] == 0:
-                # Can't set a value in an existing tuple; must regenerate tuple
-                all_ngrams[ngram] = (0, 0, max_idf)
-    return all_ngrams
+# def _ngram_values(string_list: List[str], n: int, readjust_zero_scores: bool=True) -> dict:
+#     '''Given the corpus of strings in 'string_list', computes n-gram
+#     statistics across the corpus.  Returns the results as a dictionary
+#     containing all possible n-grams, where the dictionary keys are the
+#     n-grams as strings (e.g., 'aa', 'ab', 'ac', ...) and the dictionary
+#     values dictionary are the named tuple NGramData.  The numeric values
+#     inside the NGramData reflect the frequency statistics for that n-gram
+#     across the whole corpus.
+#
+#     The optional argument 'readjust_zero_scores' governs what happens to the
+#     IDF values assigned to n-grams that do not appear in the corpus at all.
+#     If readjust_zero_scores = False, nothing is done, and the values are left
+#     at 0.  If readjust_zero_scores = True, the value is set equal to the
+#     highest IDF value found across the 'string_list' corpus.  (In our
+#     application, values of 0 in this situation are *not* desirable.  In IDF
+#     terms, a lower value indicates a more frequently-seen n-gram, whereas in
+#     our application, we look for uncommon n-grams and thus we want never-seen
+#     n-grams to have a *high* value.  This *could* be handled by detecting
+#     them when computing string scores, but that simply introduces needless
+#     repeated if-then tests in the step of computing scores for strings.  It
+#     is more efficient to store the desired value.  This is the reason the
+#     default is readjust_zero_scores = True.  Note that it is still possible
+#     to determine that a given n-gram does not appear in the corpus simply by
+#     looking at the string_frequency field of the NGramData tuple for that
+#     n-gram, so we do not really lose any information by doing this.)
+#     '''
+#     counts: Dict[str, int] = defaultdict(int)
+#     occurrences = defaultdict(set)
+#     num_strings = 0
+#     for s in string_list:
+#         s = s.lower()
+#         num_strings += 1
+#         for ngram in ngrams(s, n):
+#             occurrences[ngram].add(s)
+#             counts[ngram] += 1
+#     # Set initial values for all n-grams.
+#     all_ngrams = defaultdict.fromkeys(_all_possible_ngrams(n),
+#                                       (0, 0, 0.0))
+#     # Set n-gram values based on occurrences in the corpus.
+#     max_frequency = max([count for ngram, count in counts.items()])
+#     for ngram, string_list in occurrences.items():
+#         string_freq = len(string_list)
+#         total_freq = counts[ngram]
+#         score = _ngram_idf_value(num_strings, string_freq, total_freq, max_frequency)
+#         all_ngrams[ngram] = (string_freq, total_freq, score)
+#     # Now that we've seen all n-grams actually present in the corpus, go back
+#     # and set those that have 0 values to a very high value (=> rare n-gram).
+#     if readjust_zero_scores:
+#         max_idf = ceil(_highest_idf(all_ngrams))
+#         for ngram, value in all_ngrams.items():
+#             if value[IDF_KEY] == 0:
+#                 # Can't set a value in an existing tuple; must regenerate tuple
+#                 all_ngrams[ngram] = (0, 0, max_idf)
+#     return all_ngrams
 
 
 # When using n-gram scoring, we delete everything other than alpha characters.
@@ -393,8 +396,8 @@ def _ngram_values(string_list, n, readjust_zero_scores=True):
 
 _delchars = str.maketrans('', '', string.punctuation + string.digits + ' ')
 
-def _tfidf_score_function(ngram_freq, len_threshold=25, len_penalty_exp=1.365,
-                          repetition_penalty_exp=1.159):
+def _tfidf_score_function(ngram_freq: Dict[str, List[Union[float, int]]], len_threshold: int=25, len_penalty_exp: float=1.365,
+                          repetition_penalty_exp: float=1.159) -> Callable:
     '''Generate a function (as a closure) that computes a score for a given
     string.  This needs to be called to create the function like this:
         score_string = _tfidf_score_function(...args...)
@@ -453,13 +456,13 @@ def _tfidf_score_function(ngram_freq, len_threshold=25, len_penalty_exp=1.365,
     max_freq = _highest_total_frequency(ngram_freq)
     ngram_length = len(next(iter(ngram_freq.keys())))
     len_threshold = int(len_threshold)
-    def score_function(s):
+    def score_function(s: str) -> float:
         # We only score alpha characters.
         s = s.translate(_delchars)
         # Generate list of n-grams for the given string.
         string_ngrams = ngrams(s, ngram_length)
         # Count up occurrences of each n-gram in the string.
-        ngram_counts = defaultdict(int)
+        ngram_counts: Dict[str, int] = defaultdict(int)
         for ngram in string_ngrams:
             ngram_counts[ngram] += 1
         num_ngrams = len(string_ngrams)
@@ -542,7 +545,7 @@ _simple_nonsense_re = re.compile(
     # Banging on a qwerty keyboard.
     r"|[asdfjkl]{8}", re.I)
 
-def _simple_nonsense(text):
+def _simple_nonsense(text: str) -> bool:
     return bool(_simple_nonsense_re.search(text))
 
 #
@@ -570,7 +573,7 @@ def _simple_nonsense(text):
 # case-insensitive way, because people tend to be sloppy about the case.
 _roman_numeral_re  = re.compile(r'(^(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$)', re.I)
 
-def _simple_real(text):
+def _simple_real(text: str) -> bool:
     return bool(_roman_numeral_re.search(text))
 
 
@@ -587,19 +590,19 @@ def _simple_real(text):
 _nonalpha = string.punctuation + string.whitespace + string.digits
 _delete_nonalpha = str.maketrans('', '', _nonalpha)
 
-def sanitize_string(s):
+def sanitize_string(s: str) -> str:
     # Translate non-ASCII character codes.
     s = s.encode('ascii', errors='ignore').decode()
     # Lower-case the string & strip non-alpha.
     return s.lower().translate(_delete_nonalpha)
 
 
-def generate_nonsense_detector(ngram_freq=None,
-                               min_length=6, min_score=8.2, trace=False,
-                               pickle_file='ngram_data.mpk',
-                               score_len_threshold=25,
-                               score_len_penalty_exp=0.9233,
-                               score_rep_penalty_exp=0.9674):
+def generate_nonsense_detector(ngram_freq: Optional[Dict[str, List[Union[float, int]]]]=None,
+                               min_length: int=6, min_score: float=8.2, trace: bool=False,
+                               pickle_file: str='ngram_data.mpk',
+                               score_len_threshold: int=25,
+                               score_len_penalty_exp: float=0.9233,
+                               score_rep_penalty_exp: float=0.9674) -> Callable[[str], bool]:
     '''Returns (as a closure) a function that can take a single argument and
     return True if a given string is gibberish and False otherwise.  Usage:
 
@@ -619,6 +622,7 @@ def generate_nonsense_detector(ngram_freq=None,
         if not os.path.exists(file):
             raise ValueError('Cannot find pickle file {}'.format(file))
         ngram_freq = dataset_from_msgpack(file)
+    print(type(ngram_freq))
     string_score = _tfidf_score_function(ngram_freq,
                                         len_threshold=score_len_threshold,
                                         len_penalty_exp=score_len_penalty_exp,
@@ -666,21 +670,16 @@ def generate_nonsense_detector(ngram_freq=None,
 # will not be defined in that module, and consequently, the pickle load will
 # fail.
 
-def dataset_from_pickle(file):
+def dataset_from_pickle(file: str):
     '''Return the contents of the compressed pickle file in 'file'.  The
     pickle is assumed to contain only one data structure.
     '''
     import gzip, pickle
-    try:
-        from . import ng
-        sys.modules['ngrams'] = ng
-    except:
-        pass
     with gzip.open(file, 'rb') as pickle_file:
         return pickle.load(pickle_file)
 
 
-def dataset_to_pickle(file, data_set):
+def dataset_to_pickle(file: str, data_set: Dict[str, List[Union[float, int]]]) -> None:
     '''Save the contents of 'data_set' to the compressed pickle file 'file'.
     The pickle is assumed to contain only one data structure.
     '''
@@ -689,21 +688,15 @@ def dataset_to_pickle(file, data_set):
         pickle.dump(data_set, pickle_file)
 
 
-def dataset_from_msgpack(file):
+def dataset_from_msgpack(file: str) -> Dict[str, List[Union[float, int]]]:
     '''Return the contents of the compressed msgpack file in 'file'.  The
     msgpack is assumed to contain only one data structure.
     '''
     import msgspec
-    try:
-        from . import ng
-        sys.modules['ngrams'] = ng
-    except:
-        pass
 
     with open(file, 'rb') as msgpack_file:
         compressed = msgpack_file.read()
-        data = msgspec.msgpack.decode(compressed)
-        return data
+        return msgspec.msgpack.decode(compressed)
 
 
 def dataset_to_msgpack(file, data_set):
@@ -720,7 +713,7 @@ def dataset_to_msgpack(file, data_set):
 # Miscellaneous general utilities.
 # .............................................................................
 
-def _full_path(filename, subdir=None):
+def _full_path(filename: str, subdir: Optional[str]=None) -> str:
     '''Return a full path based on the current file or current working dir.
     'filename' is assumed to be a simple file name and not a path.  Optional
     'subdir' can be a subdirectory relative, to the current directory, where
@@ -932,38 +925,38 @@ def test_labeled(input_file, nonsense_tester, min_length=6, trace_scores=False,
         return run_tests(input_file, trace_scores=trace_scores)
 
 
-def tabulate_scores(string_list, ngram_freq, show=50, portion='all',
-                    order='descending', precomputed=None, doreturn=False):
-    from operator import itemgetter
-    from tabulate import tabulate
-    if precomputed:
-        sorted_scores = sorted(precomputed, key=itemgetter(1),
-                               reverse=not(order.startswith('ascend')))
-    else:
-        scores = []
-        ngram_length = len(next(iter(ngram_freq.keys())))
-        max_frequency = _highest_total_frequency(ngram_freq)
-        for s in string_list:
-            score = string_score(s, ngram_freq, ngram_length, max_frequency)
-            scores.append([s, score])
-        sorted_scores = sorted(scores, key=itemgetter(1),
-                               reverse=not(order.startswith('ascend')))
-    if isinstance(show, int):
-        if portion == 'all':
-            show_scores = sorted_scores[0::int(len(sorted_scores)/show)]
-        elif portion == 'top':
-            show_scores = sorted_scores[:show]
-        else:
-            show_scores = sorted_scores[-show:]
-    else:
-        show_scores = [s for s in sorted_scores if s[0] == show]
-    print('-'*70)
-    if isinstance(show, int):
-        print('Showing {} values sorted by {} column'.format(show, ordinal(1)))
-    print(tabulate(show_scores, tablefmt=format, headers=['String', 'score ']))
-    print('-'*70)
-    if doreturn:
-        return sorted_scores
+# def tabulate_scores(string_list, ngram_freq, show=50, portion='all',
+#                     order='descending', precomputed=None, doreturn=False):
+#     from operator import itemgetter
+#     from tabulate import tabulate
+#     if precomputed:
+#         sorted_scores = sorted(precomputed, key=itemgetter(1),
+#                                reverse=not(order.startswith('ascend')))
+#     else:
+#         scores = []
+#         ngram_length = len(next(iter(ngram_freq.keys())))
+#         max_frequency = _highest_total_frequency(ngram_freq)
+#         for s in string_list:
+#             score = string_score(s, ngram_freq, ngram_length, max_frequency)
+#             scores.append([s, score])
+#         sorted_scores = sorted(scores, key=itemgetter(1),
+#                                reverse=not(order.startswith('ascend')))
+#     if isinstance(show, int):
+#         if portion == 'all':
+#             show_scores = sorted_scores[0::int(len(sorted_scores)/show)]
+#         elif portion == 'top':
+#             show_scores = sorted_scores[:show]
+#         else:
+#             show_scores = sorted_scores[-show:]
+#     else:
+#         show_scores = [s for s in sorted_scores if s[0] == show]
+#     print('-'*70)
+#     if isinstance(show, int):
+#         print('Showing {} values sorted by {} column'.format(show, ordinal(1)))
+#     print(tabulate(show_scores, tablefmt=format, headers=['String', 'score ']))
+#     print('-'*70)
+#     if doreturn:
+#         return sorted_scores
 
 
 # Module exports.
