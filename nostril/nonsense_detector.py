@@ -327,7 +327,11 @@ def _highest_total_frequency(ngram_freq: Dict[str, NGramDataStruct]) -> Union[fl
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest total frequency of any n-gram.
     '''
-    return max(ngram_freq[n].total_frequency for n in ngram_freq)
+    max_frequency = float('-inf')
+    for ngram_data in ngram_freq.values():
+        if ngram_data.total_frequency > max_frequency:
+            max_frequency = ngram_data.total_frequency
+    return max_frequency
 
 
 
