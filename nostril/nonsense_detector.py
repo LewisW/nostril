@@ -729,7 +729,10 @@ def _full_path(filename: str, subdir: Optional[str]=None) -> str:
     else:
         import inspect
         try:
-            calling_file = inspect.getfile(sys._getframe(1))
+            # Get the current call stack
+            stack = inspect.stack()
+            # Get the filename of the current file
+            calling_file = stack[1].filename
             thisdir = os.path.dirname(os.path.realpath(calling_file))
         except:
             if '__file__' in globals():
