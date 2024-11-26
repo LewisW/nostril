@@ -29,7 +29,7 @@ import msgspec # type: ignore
 
 NGramData = namedtuple('NGramData', 'string_frequency, total_frequency, idf')
 
-class NGramDataStruct (msgspec.Struct, gc=False, omit_defaults=True):
+class NGramDataStruct (msgspec.Struct, gc=False, omit_defaults=True): # type: ignore
     string_frequency: int = 0
     total_frequency: int = 0
     idf: float = 21
