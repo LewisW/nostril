@@ -697,7 +697,7 @@ def dataset_from_msgpack(file: str) -> Dict[str, NGramDataStruct]:
     '''Return the contents of the compressed msgpack file in 'file'.  The
     msgpack is assumed to contain only one data structure.
     '''
-    import msgspec
+    import msgspec # type: ignore
 
     with open(file, 'rb') as msgpack_file:
         compressed = msgpack_file.read()
@@ -708,7 +708,7 @@ def dataset_to_msgpack(file: str, data_set: Dict[str, NGramDataStruct]) -> None:
     '''Save the contents of 'data_set' to the compressed msgpack file 'file'.
     The msgpack is assumed to contain only one data structure.
     '''
-    import msgspec
+    import msgspec # type: ignore
     with open(file, 'wb') as msgpack_file:
         compressed = msgspec.msgpack.encode(data_set)
         msgpack_file.write(compressed)
