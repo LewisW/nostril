@@ -718,32 +718,34 @@ def dataset_to_msgpack(file: str, data_set: Dict[str, NGramDataStruct]) -> None:
 # Miscellaneous general utilities.
 # .............................................................................
 
-def _full_path(filename: str, subdir: Optional[str]=None) -> str:
-    '''Return a full path based on the current file or current working dir.
-    'filename' is assumed to be a simple file name and not a path.  Optional
-    'subdir' can be a subdirectory relative, to the current directory, where
-    'filename' is found.
-    '''
-    if subdir and os.path.isabs(subdir):
-        return os.path.join(subdir, filename)
-    else:
-        import inspect
-        try:
-            # Get the current call stack
-            stack = inspect.stack()
-            # Get the filename of the current file
-            calling_file = stack[1].filename
-            thisdir = os.path.dirname(os.path.realpath(calling_file))
-        except:
-            if '__file__' in globals():
-                thisdir = os.path.dirname(os.path.realpath(__file__))
-            else:
-                thisdir = os.getcwd()
-        if subdir:
-            return os.path.join(os.path.join(thisdir, subdir), filename)
-        else:
-            return os.path.join(thisdir, filename)
+import importlib.resources
+from typing import Optional
 
+def _full_path(filename: str, package: Optional[str] = None) -> str:
+    '''Return a full path based on the package resources.
+    'filename' is assumed to be a simple file name and not a path.
+    Optional 'package' specifies the package where the resource is located.
+    '''
+    if package:
+        try:
+            with importlib.resources.path(package, filename) as path:
+                return str(path)
+        except ImportError:
+            # Fallback if package is not found
+            return importlib.resources.files(package).joinpath(filename)
+    else:
+        # If no package is specified, use the caller's package
+        import inspect
+        caller_frame = inspect.currentframe().f_back
+        caller_module = inspect.getmodule(caller_frame)
+        caller_package = caller_module.__package__ if caller_module else None
+
+        if caller_package:
+            with importlib.resources.path(caller_package, filename) as path:
+                return str(path)
+        else:
+            # Fallback to current working directory if no package is found
+            return str(importlib.resources.files().joinpath(filename))
 
 def _msg(text: str) -> None:
     '''Like the standard print(), but flushes the output immediately and
