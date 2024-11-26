@@ -1,0 +1,4 @@
+exclude docs
+exclude tests
+exclude nostril/training/word-corpora
+exclude nostril/training/identifier-corpora

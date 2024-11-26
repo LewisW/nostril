@@ -22,7 +22,7 @@ optional-dependencies = {dev = { file = ["requirements-dev.txt"] }}
 nostril = ["ngram_data.mpk", "py.typed"]
 
 [tool.mypy]
-exclude = "tests"
+exclude = ["tests"]
 
 [build-system]
 requires = ["setuptools", "mypy"]
