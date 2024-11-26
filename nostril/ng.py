@@ -22,7 +22,7 @@ Automated Software Inventory Creation System. For more, visit http://casics.org.
 
 from collections import namedtuple
 
-import msgspec
+import msgspec # type: ignore
 
 # Global data structures.
 # .............................................................................
