@@ -323,14 +323,14 @@ def _highest_idf(ngram_freq: Dict[str, NGramDataStruct]) -> Union[float, int]:
     return max(ngram_freq[n].idf for n in ngram_freq)
 
 
-def _highest_total_frequency(ngram_freq: Dict[str, NGramDataStruct]) -> Union[float, int]:
+def _highest_total_frequency(ngram_freq: Dict[str, NGramDataStruct]) -> Union[float]:
     '''Given a dictionary of n-gram score values for a corpus, returns the
     highest total frequency of any n-gram.
     '''
     max_frequency = float('-inf')
     for ngram_data in ngram_freq.values():
         if ngram_data.total_frequency > max_frequency:
-            max_frequency = ngram_data.total_frequency
+            max_frequency = float(ngram_data.total_frequency)
     return max_frequency
 
 
@@ -396,7 +396,7 @@ def _highest_total_frequency(ngram_freq: Dict[str, NGramDataStruct]) -> Union[fl
 
 _delchars = str.maketrans('', '', string.punctuation + string.digits + ' ')
 
-def _score_function(ngram_freq: Dict[str, NGramDataStruct], len_threshold: int, len_penalty_exp: float, repetition_penalty_exp: float, ngram_length: int, max_freq: int, s: str) -> float:
+def _score_function(ngram_freq: Dict[str, NGramDataStruct], len_threshold: int, len_penalty_exp: float, repetition_penalty_exp: float, ngram_length: int, max_freq: float, s: str) -> float:
     # We only score alpha characters.
     s = s.translate(_delchars)
     # Generate list of n-grams for the given string.
