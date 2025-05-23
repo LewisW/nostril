@@ -619,10 +619,10 @@ def generate_nonsense_detector(ngram_freq: Optional[Dict[str, NGramDataStruct]]=
     the argument 'pickle_file'.
     '''
     if not ngram_freq:
-        file = importlib.resources.path(pickle_file)
-        if not os.path.exists(file):
-            raise ValueError('Cannot find pickle file {}'.format(file))
-        ngram_freq = dataset_from_msgpack(file)
+        with importlib.resources.path('nostril', pickle_file) as file_path_obj:
+            if not os.path.exists(file_path_obj):
+                raise ValueError(f'Cannot find pickle file {file_path_obj}')
+            ngram_freq = dataset_from_msgpack(str(file_path_obj))
     string_score = _tfidf_score_function(ngram_freq,
                                         len_threshold=score_len_threshold,
                                         len_penalty_exp=score_len_penalty_exp,
