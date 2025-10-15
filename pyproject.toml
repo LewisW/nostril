@@ -25,5 +25,5 @@ nostril = ["ngram_data.mpk", "py.typed"]
 exclude = ["tests"]
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel>=0.38.0", "mypy", "mypyc"]
+requires = ["setuptools>=61.0", "wheel>=0.38.0", "mypy"]
 build-backend = "setuptools.build_meta"
